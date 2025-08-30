@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import API from "../../api";
 import { Card, Button, Form } from "react-bootstrap";
 
@@ -8,32 +8,54 @@ const VideoCard = ({ video }) => {
   const [comments, setComments] = useState([]);
   const [ratings, setRatings] = useState({ AvgRating: 0, TotalRatings: 0 });
 
-  const fetchComments = async () => {
-    const res = await API.get(`/getComments/${video.VideoID}`);
-    setComments(res.data);
-  };
+  // ✅ Stable fetchComments
+  const fetchComments = useCallback(async () => {
+    try {
+      const res = await API.get(`/getComments/${video.VideoID}`);
+      setComments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch comments:", err);
+    }
+  }, [video.VideoID]);
 
-  const fetchRatings = async () => {
-    const res = await API.get(`/getRatings/${video.VideoID}`);
-    setRatings(res.data || { AvgRating: 0, TotalRatings: 0 });
-  };
+  // ✅ Stable fetchRatings
+  const fetchRatings = useCallback(async () => {
+    try {
+      const res = await API.get(`/getRatings/${video.VideoID}`);
+      setRatings(res.data || { AvgRating: 0, TotalRatings: 0 });
+    } catch (err) {
+      console.error("Failed to fetch ratings:", err);
+    }
+  }, [video.VideoID]);
 
   const addComment = async () => {
-    await API.post("/comment", { videoId: video.VideoID, comment });
-    setComment("");
-    fetchComments(); // ✅ reload
+    if (!comment.trim()) return;
+    try {
+      await API.post("/comment", { videoId: video.VideoID, comment });
+      setComment("");
+      fetchComments(); // reload
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    }
   };
 
   const addRating = async () => {
-    await API.post("/rate", { videoId: video.VideoID, rating: parseInt(rating) });
-    setRating("");
-    fetchRatings(); // ✅ reload
+    const num = parseInt(rating);
+    if (isNaN(num) || num < 1 || num > 5) return;
+    try {
+      await API.post("/rate", { videoId: video.VideoID, rating: num });
+      setRating("");
+      fetchRatings(); // reload
+    } catch (err) {
+      console.error("Failed to add rating:", err);
+    }
   };
 
+  // ✅ Now ESLint is happy
   useEffect(() => {
     fetchComments();
     fetchRatings();
-  }, [video.VideoID]);
+  }, [fetchComments, fetchRatings]);
 
   return (
     <Card>
@@ -51,7 +73,7 @@ const VideoCard = ({ video }) => {
         {/* Comments list */}
         <div style={{ maxHeight: "100px", overflowY: "auto", marginBottom: "8px" }}>
           {comments.map((c, i) => (
-            <p key={i}><strong>{c.Name}:</strong> {c.CommentText}</p>
+            <p key={i}><strong>{c.Name || "User"}:</strong> {c.CommentText}</p>
           ))}
         </div>
 
